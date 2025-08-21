@@ -1,4 +1,5 @@
-import fetch from 'node-fetch';
+import fetch, { RequestInit } from 'node-fetch';
+import * as https from 'https';
 import { CodeContext } from './contextBuilder';
 
 export interface DifyResponse {
@@ -31,12 +32,12 @@ export class DifyClient {
     public async getCompletion(context: CodeContext): Promise<string | null> {
         // 首先尝试工作流 API，如果失败则尝试聊天 API
         try {
-            return await this.tryWorkflowCompletion(context);
+            return await this.retryRequest(() => this.tryWorkflowCompletion(context), 2);
         } catch (workflowError) {
             const workflowErrorMsg = workflowError instanceof Error ? workflowError.message : String(workflowError);
             console.log('工作流 API 失败，尝试聊天 API:', workflowErrorMsg);
             try {
-                return await this.tryChatCompletion(context);
+                return await this.retryRequest(() => this.tryChatCompletion(context), 2);
             } catch (chatError) {
                 const chatErrorMsg = chatError instanceof Error ? chatError.message : String(chatError);
                 throw new Error(`所有 API 端点都失败了。工作流错误: ${workflowErrorMsg}; 聊天错误: ${chatErrorMsg}`);
@@ -44,25 +45,73 @@ export class DifyClient {
         }
     }
 
+    private async retryRequest<T>(requestFn: () => Promise<T>, maxRetries: number): Promise<T> {
+        let lastError: Error;
+        
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await requestFn();
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                
+                if (attempt < maxRetries) {
+                    // 如果是连接重置错误，等待后重试
+                    if (lastError.message.includes('ECONNRESET') || 
+                        lastError.message.includes('ETIMEDOUT') ||
+                        lastError.message.includes('timeout')) {
+                        console.log(`连接失败，${1000 * (attempt + 1)}ms 后重试 (${attempt + 1}/${maxRetries + 1})`);
+                        await this.delay(1000 * (attempt + 1));
+                        continue;
+                    }
+                }
+                
+                // 如果不是网络错误或已达到最大重试次数，直接抛出
+                throw lastError;
+            }
+        }
+        
+        throw lastError!;
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     private async tryWorkflowCompletion(context: CodeContext): Promise<string | null> {
-        const response = await fetch(this.workflowUrl, {
+        const httpsAgent = new https.Agent({
+            keepAlive: true,
+            timeout: 30000,
+            rejectUnauthorized: true
+        });
+
+        const requestOptions: RequestInit = {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'VSCode-Dify-Extension/1.0.0'
+                'User-Agent': 'VSCode-Dify-Extension/1.0.0',
+                'Connection': 'keep-alive'
             },
             body: JSON.stringify({
                 inputs: context,
                 response_mode: 'blocking',
                 user: 'vscode-user'
             }),
-            timeout: 30000
-        });
+            timeout: 30000,
+            agent: httpsAgent
+        };
+
+        const response = await fetch(this.workflowUrl, requestOptions);
 
         if (!response.ok) {
             const errorText = await response.text();
-            const errorData = JSON.parse(errorText);
+            let errorData;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch {
+                throw new Error(`工作流 API 错误: ${response.status} - ${errorText}`);
+            }
+            
             if (errorData.code === 'not_workflow_app') {
                 throw new Error('应用类型不是工作流');
             }
@@ -84,12 +133,19 @@ export class DifyClient {
         // 构建聊天提示词
         const prompt = this.buildChatPrompt(context);
         
-        const response = await fetch(this.chatUrl, {
+        const httpsAgent = new https.Agent({
+            keepAlive: true,
+            timeout: 30000,
+            rejectUnauthorized: true
+        });
+
+        const requestOptions: RequestInit = {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'VSCode-Dify-Extension/1.0.0'
+                'User-Agent': 'VSCode-Dify-Extension/1.0.0',
+                'Connection': 'keep-alive'
             },
             body: JSON.stringify({
                 inputs: {},
@@ -98,8 +154,11 @@ export class DifyClient {
                 conversation_id: '',
                 user: 'vscode-user'
             }),
-            timeout: 30000
-        });
+            timeout: 30000,
+            agent: httpsAgent
+        };
+
+        const response = await fetch(this.chatUrl, requestOptions);
 
         if (!response.ok) {
             const errorText = await response.text();

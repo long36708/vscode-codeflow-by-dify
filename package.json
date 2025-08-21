@@ -1,11 +1,21 @@
 {
   "name": "vscode-codeflow-by-dify",
   "displayName": "CodeFlow by Dify",
-  "description": "基于 Dify API 的智能代码补全插件",
-  "version": "0.0.1",
+  "description": "基于 Dify API 的智能代码补全插件，支持多种编程语言的 AI 驱动代码补全",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
   "engines": {
     "vscode": "^1.74.0"
   },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/vscode-codeflow-by-dify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/vscode-codeflow-by-dify/issues"
+  },
+  "homepage": "https://github.com/your-username/vscode-codeflow-by-dify#readme",
   "categories": [
     "Other",
     "Machine Learning",

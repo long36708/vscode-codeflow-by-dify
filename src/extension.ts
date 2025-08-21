@@ -92,6 +92,8 @@ export function activate(context: vscode.ExtensionContext) {
     // 检查初始配置
     checkInitialConfiguration();
 
+    // 深拷贝
+    
     UiManager.showStatusReady();
 }
 
