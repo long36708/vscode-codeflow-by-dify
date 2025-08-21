@@ -16,52 +16,147 @@ export interface DifyResponse {
 export class DifyClient {
     private apiKey: string;
     private workflowUrl: string;
+    private chatUrl: string;
     private baseUrl: string;
+    private workflowId: string;
 
     constructor(apiKey: string, workflowId: string, baseUrl: string = 'https://api.dify.ai/v1') {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
+        this.workflowId = workflowId;
         this.workflowUrl = `${baseUrl}/workflows/${workflowId}/run`;
+        this.chatUrl = `${baseUrl}/chat-messages`;
     }
 
     public async getCompletion(context: CodeContext): Promise<string | null> {
+        // 首先尝试工作流 API，如果失败则尝试聊天 API
         try {
-            const response = await fetch(this.workflowUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'VSCode-Dify-Extension/1.0.0'
-                },
-                body: JSON.stringify({
-                    inputs: context,
-                    response_mode: 'blocking',
-                    user: 'vscode-user'
-                }),
-                timeout: 30000 // 30秒超时
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Dify API error: ${response.status} - ${errorText}`);
+            return await this.tryWorkflowCompletion(context);
+        } catch (workflowError) {
+            const workflowErrorMsg = workflowError instanceof Error ? workflowError.message : String(workflowError);
+            console.log('工作流 API 失败，尝试聊天 API:', workflowErrorMsg);
+            try {
+                return await this.tryChatCompletion(context);
+            } catch (chatError) {
+                const chatErrorMsg = chatError instanceof Error ? chatError.message : String(chatError);
+                throw new Error(`所有 API 端点都失败了。工作流错误: ${workflowErrorMsg}; 聊天错误: ${chatErrorMsg}`);
             }
-
-            const data = await response.json() as DifyResponse;
-            
-            if (data.status === 'succeeded' && data.outputs?.completion) {
-                return data.outputs.completion;
-            } else if (data.error) {
-                throw new Error(`Dify workflow error: ${data.error}`);
-            } else {
-                return null;
-            }
-
-        } catch (error) {
-            if (error instanceof Error) {
-                throw error;
-            }
-            throw new Error(`Unknown error: ${String(error)}`);
         }
+    }
+
+    private async tryWorkflowCompletion(context: CodeContext): Promise<string | null> {
+        const response = await fetch(this.workflowUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'VSCode-Dify-Extension/1.0.0'
+            },
+            body: JSON.stringify({
+                inputs: context,
+                response_mode: 'blocking',
+                user: 'vscode-user'
+            }),
+            timeout: 30000
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData.code === 'not_workflow_app') {
+                throw new Error('应用类型不是工作流');
+            }
+            throw new Error(`工作流 API 错误: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json() as DifyResponse;
+        
+        if (data.status === 'succeeded' && data.outputs?.completion) {
+            return data.outputs.completion;
+        } else if (data.error) {
+            throw new Error(`工作流执行错误: ${data.error}`);
+        }
+        
+        return null;
+    }
+
+    private async tryChatCompletion(context: CodeContext): Promise<string | null> {
+        // 构建聊天提示词
+        const prompt = this.buildChatPrompt(context);
+        
+        const response = await fetch(this.chatUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'VSCode-Dify-Extension/1.0.0'
+            },
+            body: JSON.stringify({
+                inputs: {},
+                query: prompt,
+                response_mode: 'blocking',
+                conversation_id: '',
+                user: 'vscode-user'
+            }),
+            timeout: 30000
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`聊天 API 错误: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.answer) {
+            // 从聊天回复中提取代码补全
+            return this.extractCodeFromChatResponse(data.answer);
+        }
+        
+        return null;
+    }
+
+    private buildChatPrompt(context: CodeContext): string {
+        return `请为以下 ${context.language} 代码提供补全建议。只返回需要补全的代码部分，不要包含解释或其他文本。
+
+当前代码:
+\`\`\`${context.language}
+${context.code_before_cursor}
+\`\`\`
+
+请补全光标位置的代码:`;
+    }
+
+    private extractCodeFromChatResponse(answer: string): string {
+        // 尝试从回复中提取代码块
+        const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)\s*```/;
+        const match = answer.match(codeBlockRegex);
+        
+        if (match && match[1]) {
+            // 提取代码块中的内容
+            const code = match[1].trim();
+            // 如果是完整函数，只返回补全部分
+            if (code.includes('function') && code.includes('{') && code.includes('}')) {
+                // 尝试提取 return 语句或函数体
+                const returnMatch = code.match(/return\s+([^;]+);?/);
+                if (returnMatch) {
+                    return ` ${returnMatch[1]};`;
+                }
+            }
+            return code;
+        }
+        
+        // 如果没有代码块，尝试直接提取简单的补全
+        const lines = answer.split('\n');
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('Here') && !trimmed.startsWith('This') && 
+                !trimmed.startsWith('The') && !trimmed.includes('function')) {
+                return trimmed;
+            }
+        }
+        
+        return answer.trim();
     }
 
     public async testConnection(): Promise<boolean> {
@@ -75,7 +170,7 @@ export class DifyClient {
             };
 
             const result = await this.getCompletion(testContext);
-            return result !== null;
+            return result !== null && result.length > 0;
         } catch (error) {
             console.error('Dify connection test failed:', error);
             return false;
