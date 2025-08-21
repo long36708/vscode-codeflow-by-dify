@@ -1,0 +1,137 @@
+{
+  "name": "vscode-codeflow-by-dify",
+  "displayName": "CodeFlow by Dify",
+  "description": "基于 Dify API 的智能代码补全插件",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning",
+    "Snippets"
+  ],
+  "keywords": [
+    "code completion",
+    "ai",
+    "dify",
+    "智能补全"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:go"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Dify Code Completion",
+      "properties": {
+        "dify.codeCompletion.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Dify API Key",
+          "markdownDescription": "您的 Dify API 密钥。获取方式：登录 Dify 控制台 → API 管理 → 创建密钥"
+        },
+        "dify.codeCompletion.workflowId": {
+          "type": "string",
+          "default": "",
+          "description": "The Workflow ID in Dify for code completion",
+          "markdownDescription": "用于代码补全的 Dify 工作流 ID"
+        },
+        "dify.codeCompletion.baseUrl": {
+          "type": "string",
+          "default": "https://api.dify.ai/v1",
+          "description": "Dify API base URL",
+          "markdownDescription": "Dify API 基础 URL（私有部署时可修改）"
+        },
+        "dify.codeCompletion.autoTrigger": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable auto-trigger on typing",
+          "markdownDescription": "启用输入时自动触发补全"
+        },
+        "dify.codeCompletion.triggerDelay": {
+          "type": "number",
+          "default": 500,
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "Delay in ms before triggering auto-completion",
+          "markdownDescription": "自动补全触发延迟（毫秒）"
+        },
+        "dify.codeCompletion.contextLines": {
+          "type": "number",
+          "default": 10,
+          "minimum": 5,
+          "maximum": 50,
+          "description": "Number of lines before cursor to include as context",
+          "markdownDescription": "作为上下文的光标前行数"
+        },
+        "dify.codeCompletion.languages": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {
+            "javascript": "javascript",
+            "typescript": "typescript",
+            "python": "python",
+            "go": "go",
+            "java": "java",
+            "cpp": "cpp",
+            "c": "c"
+          },
+          "description": "Map VS Code language IDs to Dify language codes",
+          "markdownDescription": "VS Code 语言 ID 到 Dify 语言代码的映射"
+        },
+        "dify.codeCompletion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable the extension",
+          "markdownDescription": "启用/禁用插件"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "dify.triggerCompletion",
+        "title": "Trigger Code Completion",
+        "category": "Dify"
+      },
+      {
+        "command": "dify.openSettings",
+        "title": "Open Settings",
+        "category": "Dify"
+      },
+      {
+        "command": "dify.testConnection",
+        "title": "Test API Connection",
+        "category": "Dify"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "dify.triggerCompletion",
+        "key": "ctrl+alt+space",
+        "mac": "cmd+alt+space",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "@types/node-fetch": "^2.6.2"
+  }
+}
