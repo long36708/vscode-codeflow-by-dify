@@ -91,6 +91,12 @@
           "default": true,
           "description": "Enable/disable the extension",
           "markdownDescription": "启用/禁用插件"
+        },
+        "dify.codeCompletion.testConnection": {
+          "type": "boolean",
+          "default": false,
+          "description": "Test API connection (click to test)",
+          "markdownDescription": "**测试 API 连接**  \n点击下方按钮测试连接状态。确保已正确配置 API Key 和 Workflow ID。"
         }
       }
     },
@@ -115,7 +121,7 @@
       {
         "command": "dify.triggerCompletion",
         "key": "ctrl+alt+space",
-        "mac": "cmd+alt+space",
+        "mac": "cmd+alt+1",
         "when": "editorTextFocus"
       }
     ]

@@ -38,12 +38,20 @@
 
 ### 3. 配置插件
 
-1. 打开 VS Code 设置 (`Ctrl+,`)
-2. 搜索 "Dify"
-3. 配置以下选项：
+#### 方法一：可视化设置面板（推荐）
+1. 按 `Ctrl+Shift+P` 打开命令面板
+2. 输入 "Dify: Open Settings" 并回车
+3. 在设置面板中配置：
    - **API Key**: 您的 Dify API 密钥
    - **Workflow ID**: 代码补全工作流的 ID
    - **Base URL**: Dify API 基础 URL（默认为官方 API）
+4. 点击 **"测试连接"** 按钮验证配置
+5. 点击 **"保存配置"** 保存设置
+
+#### 方法二：VS Code 设置
+1. 打开 VS Code 设置 (`Ctrl+,`)
+2. 搜索 "Dify"
+3. 配置相应选项
 
 ## 使用方法
 

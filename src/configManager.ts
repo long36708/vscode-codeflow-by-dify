@@ -56,11 +56,16 @@ export class ConfigManager {
         return config.languages[languageId] || languageId;
     }
 
-    public static onConfigurationChanged(callback: () => void): vscode.Disposable {
+    public static onConfigurationChanged(callback: (event: vscode.ConfigurationChangeEvent) => void): vscode.Disposable {
         return vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('dify.codeCompletion')) {
-                callback();
+                callback(event);
             }
         });
+    }
+
+    public static async resetTestConnection(): Promise<void> {
+        const config = vscode.workspace.getConfiguration('dify.codeCompletion');
+        await config.update('testConnection', false, vscode.ConfigurationTarget.Global);
     }
 }

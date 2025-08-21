@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DifyCompletionProvider } from './completionProvider';
 import { ConfigManager } from './configManager';
 import { UiManager } from './uiManager';
+import { SettingsPanel } from './settingsPanel';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Dify Code Completion extension is now active!');
@@ -40,7 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const openSettingsCommand = vscode.commands.registerCommand('dify.openSettings', () => {
-        vscode.commands.executeCommand('workbench.action.openSettings', 'dify.codeCompletion');
+        SettingsPanel.createOrShow(context.extensionUri);
     });
 
     const testConnectionCommand = vscode.commands.registerCommand('dify.testConnection', async () => {
@@ -69,6 +70,24 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(triggerCompletionCommand, openSettingsCommand, testConnectionCommand);
+
+    // 监听配置变化，特别是测试连接按钮
+    const configChangeListener = ConfigManager.onConfigurationChanged(async (event) => {
+        if (event.affectsConfiguration('dify.codeCompletion.testConnection')) {
+            const testConnectionConfig = vscode.workspace.getConfiguration('dify.codeCompletion');
+            const shouldTest = testConnectionConfig.get<boolean>('testConnection', false);
+            
+            if (shouldTest) {
+                // 重置配置值
+                await ConfigManager.resetTestConnection();
+                
+                // 执行测试连接
+                await vscode.commands.executeCommand('dify.testConnection');
+            }
+        }
+    });
+    
+    context.subscriptions.push(configChangeListener);
 
     // 检查初始配置
     checkInitialConfiguration();
