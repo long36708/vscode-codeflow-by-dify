@@ -8,6 +8,7 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
     private lastTriggerTime: number = 0;
     private cache: Map<string, vscode.CompletionItem[]> = new Map();
     private readonly cacheTimeout = 5 * 60 * 1000; // 5分钟缓存
+    private loadingTimeout: NodeJS.Timeout | null = null;
 
     public async provideCompletionItems(
         document: vscode.TextDocument,
@@ -17,7 +18,7 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
     ): Promise<vscode.CompletionItem[] | null> {
 
         // 检查是否应该触发补全
-        if (!ContextBuilder.shouldTriggerCompletion(document, position, context)) {
+        if (!this.shouldProvideCompletion(document, position, context)) {
             return null;
         }
 
@@ -50,14 +51,27 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
             return cached;
         }
 
-        // 显示加载状态
+        // 显示加载状态并设置超时保护
         UiManager.showStatusLoading();
+        
+        // 清除之前的超时
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+        }
+        
+        // 设置5秒超时，强制恢复状态
+        this.loadingTimeout = setTimeout(() => {
+            console.log('Dify completion timeout - forcing status reset');
+            UiManager.showStatusReady();
+        }, 5000);
 
         try {
             const client = new DifyClient(config.apiKey, config.workflowId, config.baseUrl);
             
             // 检查取消令牌
             if (token.isCancellationRequested) {
+                this.clearLoadingTimeout();
+                UiManager.showStatusReady();
                 return null;
             }
 
@@ -65,10 +79,13 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
             const completion = await client.getCompletion(codeContext);
             
             if (token.isCancellationRequested) {
+                this.clearLoadingTimeout();
+                UiManager.showStatusReady();
                 return null;
             }
 
             if (!completion) {
+                this.clearLoadingTimeout();
                 UiManager.showStatusReady();
                 return [];
             }
@@ -80,11 +97,19 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
             this.cache.set(cacheKey, items);
             setTimeout(() => this.cache.delete(cacheKey), this.cacheTimeout);
 
+            this.clearLoadingTimeout();
             UiManager.showStatusReady();
             return items;
 
         } catch (error) {
+            // 确保在任何错误情况下都清除 loading 状态
+            this.clearLoadingTimeout();
             UiManager.showStatusError();
+            
+            // 2秒后恢复到 Ready 状态
+            setTimeout(() => {
+                UiManager.showStatusReady();
+            }, 2000);
             
             if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
@@ -145,5 +170,91 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
 
     public clearCache(): void {
         this.cache.clear();
+    }
+
+    private clearLoadingTimeout(): void {
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
+        }
+    }
+
+    private shouldProvideCompletion(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        context: vscode.CompletionContext
+    ): boolean {
+        const config = ConfigManager.getConfiguration();
+        
+        // 检查是否启用
+        if (!config.enabled) {
+            console.log('Dify completion disabled in config');
+            return false;
+        }
+
+        // 检查语言支持
+        if (!ConfigManager.isLanguageSupported(document.languageId)) {
+            console.log(`Language ${document.languageId} not supported`);
+            return false;
+        }
+
+        // 如果是手动触发，总是允许
+        if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
+            console.log('Manual trigger - allowing completion');
+            return true;
+        }
+
+        // 如果禁用了自动触发，只允许手动触发
+        if (!config.autoTrigger) {
+            if (context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter || 
+                context.triggerKind === vscode.CompletionTriggerKind.TriggerForIncompleteCompletions) {
+                console.log('Auto trigger disabled');
+                return false;
+            }
+        }
+
+        // 检查当前行内容
+        const lineText = document.lineAt(position.line).text;
+        const beforeCursor = lineText.substring(0, position.character);
+        
+        // 跳过空行或只有空格的行
+        if (beforeCursor.trim().length === 0) {
+            return false;
+        }
+
+        // 改进的注释检测 - 支持注释后换行的代码补全
+        const trimmedBefore = beforeCursor.trim();
+        
+        // 检查是否在注释中（但允许注释后的新行）
+        if (trimmedBefore.length > 0) {
+            // 如果当前行有内容且是注释，跳过
+            if (trimmedBefore.startsWith('//') || trimmedBefore.startsWith('#') || 
+                trimmedBefore.startsWith('/*') || trimmedBefore.startsWith('*')) {
+                return false;
+            }
+        } else {
+            // 如果当前行为空，检查上一行是否是注释
+            if (position.line > 0) {
+                const prevLineText = document.lineAt(position.line - 1).text.trim();
+                
+                // 如果上一行是注释（如 "// 深拷贝"），允许在新行触发补全
+                if (prevLineText.startsWith('//') || prevLineText.startsWith('#')) {
+                    console.log('Allowing completion after comment line:', prevLineText);
+                    return true;
+                }
+            }
+        }
+
+        // 检查是否在字符串中
+        const singleQuotes = (beforeCursor.match(/'/g) || []).length;
+        const doubleQuotes = (beforeCursor.match(/"/g) || []).length;
+        const backticks = (beforeCursor.match(/`/g) || []).length;
+        
+        if (singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1) {
+            return false;
+        }
+
+        console.log(`Completion trigger allowed for ${document.languageId} at ${position.line}:${position.character}`);
+        return true;
     }
 }

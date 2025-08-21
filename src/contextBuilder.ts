@@ -24,7 +24,18 @@ export class ContextBuilder {
         const startLine = Math.max(0, line - config.contextLines);
         const start = new vscode.Position(startLine, 0);
         const end = position;
-        const codeBefore = document.getText(new vscode.Range(start, end));
+        let codeBefore = document.getText(new vscode.Range(start, end));
+
+        // 特殊处理：如果当前行为空且上一行是注释，包含注释作为上下文
+        const currentLineText = document.lineAt(position.line).text.trim();
+        if (currentLineText.length === 0 && position.line > 0) {
+            const prevLineText = document.lineAt(position.line - 1).text.trim();
+            if (prevLineText.startsWith('//') || prevLineText.startsWith('#')) {
+                // 提取注释内容作为提示
+                const commentContent = prevLineText.replace(/^(\/\/|#)\s*/, '');
+                codeBefore += `\n// TODO: ${commentContent}\n`;
+            }
+        }
 
         // 获取光标后的少量代码作为上下文（可选）
         const endLine = Math.min(document.lineCount - 1, line + 3);

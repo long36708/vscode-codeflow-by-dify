@@ -21,9 +21,9 @@ export function activate(context: vscode.ExtensionContext) {
     
     supportedLanguages.forEach(language => {
         const disposable = vscode.languages.registerCompletionItemProvider(
-            language,
+            { scheme: 'file', language: language },
             completionProvider,
-            '.' // 触发字符
+            '.', ' ', '(', '=', '{', '\n' // 多个触发字符
         );
         context.subscriptions.push(disposable);
     });

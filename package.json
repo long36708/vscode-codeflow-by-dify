@@ -131,7 +131,7 @@
       {
         "command": "dify.triggerCompletion",
         "key": "ctrl+alt+space",
-        "mac": "cmd+alt+1",
+        "mac": "cmd+shift+space",
         "when": "editorTextFocus"
       }
     ]
