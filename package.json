@@ -2,8 +2,8 @@
   "name": "vscode-codeflow-by-dify",
   "displayName": "CodeFlow by Dify",
   "description": "基于 Dify API 的智能代码补全插件，支持多种编程语言的 AI 驱动代码补全",
-  "version": "1.0.0",
-  "publisher": "your-publisher-name",
+  "version": "1.0.1",
+  "publisher": "longmo",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -30,8 +30,18 @@
   "activationEvents": [
     "onLanguage:javascript",
     "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascriptreact",
+    "onLanguage:vue",
+    "onLanguage:svelte",
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:scss",
     "onLanguage:python",
-    "onLanguage:go"
+    "onLanguage:go",
+    "onLanguage:java",
+    "onLanguage:php",
+    "onLanguage:rust"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -87,11 +97,33 @@
           "default": {
             "javascript": "javascript",
             "typescript": "typescript",
+            "typescriptreact": "typescript",
+            "javascriptreact": "javascript",
+            "vue": "vue",
+            "svelte": "javascript",
+            "html": "html",
+            "css": "css",
+            "scss": "css",
+            "sass": "css",
+            "less": "css",
+            "json": "json",
+            "jsonc": "json",
+            "yaml": "yaml",
+            "xml": "xml",
             "python": "python",
             "go": "go",
             "java": "java",
             "cpp": "cpp",
-            "c": "c"
+            "c": "c",
+            "csharp": "csharp",
+            "php": "php",
+            "ruby": "ruby",
+            "rust": "rust",
+            "kotlin": "kotlin",
+            "swift": "swift",
+            "sql": "sql",
+            "markdown": "markdown",
+            "shellscript": "bash"
           },
           "description": "Map VS Code language IDs to Dify language codes",
           "markdownDescription": "VS Code 语言 ID 到 Dify 语言代码的映射"
@@ -107,6 +139,39 @@
           "default": false,
           "description": "Test API connection (click to test)",
           "markdownDescription": "**测试 API 连接**  \n点击下方按钮测试连接状态。确保已正确配置 API Key 和 Workflow ID。"
+        },
+        "dify.codeCompletion.triggerCharacters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [".", " ", "(", "=", "{", "\n"],
+          "description": "Characters that trigger auto-completion",
+          "markdownDescription": "触发自动补全的字符列表。支持特殊字符：\\n (换行)、\\t (制表符)、\\s (空格)"
+        },
+        "dify.codeCompletion.triggerKeybinding": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "default": "ctrl+alt+space"
+            },
+            "mac": {
+              "type": "string", 
+              "default": "cmd+shift+space"
+            },
+            "when": {
+              "type": "string",
+              "default": "editorTextFocus"
+            }
+          },
+          "default": {
+            "key": "ctrl+alt+space",
+            "mac": "cmd+shift+space", 
+            "when": "editorTextFocus"
+          },
+          "description": "Custom keybinding for triggering code completion",
+          "markdownDescription": "自定义触发代码补全的快捷键配置。支持 VS Code 快捷键格式，如：ctrl+alt+space、cmd+shift+i 等"
         }
       }
     },
@@ -124,6 +189,11 @@
       {
         "command": "dify.testConnection",
         "title": "Test API Connection",
+        "category": "Dify"
+      },
+      {
+        "command": "dify.updateKeybinding",
+        "title": "Update Keybinding Configuration",
         "category": "Dify"
       }
     ],

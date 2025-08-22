@@ -1,41 +1,37 @@
 import * as vscode from 'vscode';
 
 export class UiManager {
-    private static statusBarItem: vscode.StatusBarItem;
-
+    // 移除状态栏管理，由 extension.ts 统一管理
     public static initialize() {
-        // 创建状态栏项
-        this.statusBarItem = vscode.window.createStatusBarItem(
-            vscode.StatusBarAlignment.Right,
-            100
-        );
-        this.statusBarItem.command = 'dify.openSettings';
-        this.statusBarItem.show();
-        this.showStatusReady();
+        // 不再创建状态栏项，由 extension.ts 统一管理
     }
 
     public static showStatusReady() {
-        this.statusBarItem.text = '$(check) Dify: Ready';
-        this.statusBarItem.tooltip = 'Dify Code Completion is ready. Click to open settings.';
-        this.statusBarItem.backgroundColor = undefined;
+        // 使用全局状态更新函数
+        if ((global as any).updateDifyStatus) {
+            (global as any).updateDifyStatus('ready');
+        }
     }
 
     public static showStatusLoading() {
-        this.statusBarItem.text = '$(loading~spin) Dify: Loading...';
-        this.statusBarItem.tooltip = 'Dify is generating code completion...';
-        this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+        // 使用全局状态更新函数
+        if ((global as any).updateDifyStatus) {
+            (global as any).updateDifyStatus('working');
+        }
     }
 
-    public static showStatusError() {
-        this.statusBarItem.text = '$(error) Dify: Error';
-        this.statusBarItem.tooltip = 'Dify API error. Click to open settings.';
-        this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    public static showStatusError(message?: string) {
+        // 使用全局状态更新函数
+        if ((global as any).updateDifyStatus) {
+            (global as any).updateDifyStatus('error', message);
+        }
     }
 
     public static showStatusDisabled() {
-        this.statusBarItem.text = '$(circle-slash) Dify: Disabled';
-        this.statusBarItem.tooltip = 'Dify Code Completion is disabled. Click to open settings.';
-        this.statusBarItem.backgroundColor = undefined;
+        // 使用全局状态更新函数
+        if ((global as any).updateDifyStatus) {
+            (global as any).updateDifyStatus('disabled');
+        }
     }
 
     public static showInfo(message: string) {
@@ -62,8 +58,6 @@ export class UiManager {
     }
 
     public static dispose() {
-        if (this.statusBarItem) {
-            this.statusBarItem.dispose();
-        }
+        // 状态栏现在由 extension.ts 管理，这里不需要处理
     }
 }

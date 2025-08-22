@@ -16,16 +16,31 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
         token: vscode.CancellationToken,
         context: vscode.CompletionContext
     ): Promise<vscode.CompletionItem[] | null> {
+        console.log('🚀 Dify completion triggered:', {
+            language: document.languageId,
+            triggerKind: context.triggerKind,
+            triggerCharacter: context.triggerCharacter,
+            position: `${position.line}:${position.character}`
+        });
 
         // 检查是否应该触发补全
         if (!this.shouldProvideCompletion(document, position, context)) {
+            console.log('❌ Completion blocked by shouldProvideCompletion');
             return null;
         }
 
         const config = ConfigManager.getConfiguration();
+        console.log('⚙️ Config loaded:', {
+            hasApiKey: !!config.apiKey,
+            hasWorkflowId: !!config.workflowId,
+            enabled: config.enabled,
+            autoTrigger: config.autoTrigger,
+            triggerDelay: config.triggerDelay
+        });
         
         // 检查配置
         if (!config.apiKey || !config.workflowId) {
+            console.log('❌ Missing API configuration');
             if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
                 UiManager.showWarning('请先配置 Dify API Key 和 Workflow ID');
             }
@@ -36,6 +51,7 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
         const now = Date.now();
         if (config.autoTrigger && context.triggerKind === vscode.CompletionTriggerKind.TriggerCharacter) {
             if (now - this.lastTriggerTime < config.triggerDelay) {
+                console.log('⏰ Completion blocked by debounce:', now - this.lastTriggerTime, 'ms < ', config.triggerDelay, 'ms');
                 return null;
             }
         }
@@ -43,15 +59,23 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
 
         // 构建上下文
         const codeContext = ContextBuilder.buildContext(document, position);
+        console.log('📝 Code context built:', {
+            language: codeContext.language,
+            lineNumber: codeContext.line_number,
+            beforeCursor: codeContext.code_before_cursor?.substring(0, 50) + '...',
+            afterCursor: codeContext.code_after_cursor?.substring(0, 50) + '...'
+        });
         
         // 检查缓存
         const cacheKey = this.generateCacheKey(codeContext);
         const cached = this.cache.get(cacheKey);
         if (cached && this.isCacheValid(cacheKey)) {
+            console.log('💾 Using cached completion');
             return cached;
         }
 
         // 显示加载状态并设置超时保护
+        console.log('🔄 Starting Dify API call...');
         UiManager.showStatusLoading();
         
         // 清除之前的超时
