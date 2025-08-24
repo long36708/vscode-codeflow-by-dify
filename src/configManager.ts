@@ -2,13 +2,15 @@ import * as vscode from 'vscode';
 
 export interface DifyConfig {
     apiKey: string;
-    workflowId: string;
     baseUrl: string;
     autoTrigger: boolean;
     triggerDelay: number;
     contextLines: number;
     languages: Record<string, string>;
     enabled: boolean;
+    appType: 'auto' | 'workflow' | 'chatbot';
+    fallbackEnabled: boolean;
+    preferredAppType: 'workflow' | 'chatbot';
 }
 
 export class ConfigManager {
@@ -23,7 +25,6 @@ export class ConfigManager {
         
         return {
             apiKey: config.get<string>('apiKey', ''),
-            workflowId: config.get<string>('workflowId', ''),
             baseUrl: config.get<string>('baseUrl', 'https://api.dify.ai/v1'),
             autoTrigger: config.get<boolean>('autoTrigger', true),
             triggerDelay: config.get<number>('triggerDelay', 500),
@@ -59,7 +60,10 @@ export class ConfigManager {
                 'markdown': 'markdown',
                 'shellscript': 'bash'
             }),
-            enabled: config.get<boolean>('enabled', true)
+            enabled: config.get<boolean>('enabled', true),
+            appType: config.get<'auto' | 'workflow' | 'chatbot'>('appType', 'workflow'),
+            fallbackEnabled: config.get<boolean>('fallbackEnabled', true),
+            preferredAppType: config.get<'workflow' | 'chatbot'>('preferredAppType', 'workflow')
         };
     }
 

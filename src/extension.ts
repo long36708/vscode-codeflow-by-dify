@@ -30,8 +30,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     const testConnectionCommand = vscode.commands.registerCommand('dify.testConnection', async () => {
         const config = ConfigManager.getConfiguration();
-        if (!config.apiKey || !config.workflowId) {
-            UiManager.showError('请先配置 API Key 和 Workflow ID');
+        if (!config.apiKey) {
+            UiManager.showError('请先配置 API Key');
             return;
         }
 
@@ -39,10 +39,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             const { DifyClient } = await import('./difyClient');
-            const client = new DifyClient(config.apiKey, config.workflowId, config.baseUrl);
+            const client = new DifyClient(config.apiKey, config.baseUrl);
             
             // 测试连接
-            const testResult = await client.testConnection();
+            const testResult = await client.testConnection(
+                config.appType, 
+                config.fallbackEnabled, 
+                config.preferredAppType
+            );
             if (testResult) {
                 UiManager.showInfo('✅ Dify API 连接成功！');
             } else {
@@ -276,7 +280,7 @@ Mac: ${keybindingConfig.mac}
     
     // 根据配置状态设置初始状态栏显示
     const config = ConfigManager.getConfiguration();
-    if (!config.apiKey || !config.workflowId) {
+    if (!config.apiKey) {
         updateStatusBar('disabled');
     } else {
         updateStatusBar('ready');
@@ -286,9 +290,9 @@ Mac: ${keybindingConfig.mac}
 function checkInitialConfiguration() {
     const config = ConfigManager.getConfiguration();
     
-    if (!config.apiKey || !config.workflowId) {
+    if (!config.apiKey) {
         vscode.window.showInformationMessage(
-            '欢迎使用 Dify Code Completion！请先配置 API Key 和 Workflow ID。',
+            '欢迎使用 Dify Code Completion！请先配置 API Key。',
             '打开设置'
         ).then(selection => {
             if (selection === '打开设置') {

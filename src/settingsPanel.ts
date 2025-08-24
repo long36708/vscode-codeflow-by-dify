@@ -64,8 +64,12 @@ export class SettingsPanel {
                 message: '正在测试连接...'
             });
 
-            const client = new DifyClient(config.apiKey, config.workflowId, config.baseUrl);
-            const result = await client.testConnection();
+            const client = new DifyClient(config.apiKey, config.baseUrl);
+            const result = await client.testConnection(
+                config.appType, 
+                config.fallbackEnabled, 
+                config.preferredAppType
+            );
 
             this._panel.webview.postMessage({
                 command: 'testResult',
@@ -85,7 +89,6 @@ export class SettingsPanel {
     private async handleSaveConfig(config: any) {
         try {
             await ConfigManager.updateConfiguration('apiKey', config.apiKey);
-            await ConfigManager.updateConfiguration('workflowId', config.workflowId);
             await ConfigManager.updateConfiguration('baseUrl', config.baseUrl);
             await ConfigManager.updateConfiguration('autoTrigger', config.autoTrigger);
             await ConfigManager.updateConfiguration('triggerDelay', config.triggerDelay);

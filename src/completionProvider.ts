@@ -32,17 +32,17 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
         const config = ConfigManager.getConfiguration();
         console.log('⚙️ Config loaded:', {
             hasApiKey: !!config.apiKey,
-            hasWorkflowId: !!config.workflowId,
             enabled: config.enabled,
             autoTrigger: config.autoTrigger,
-            triggerDelay: config.triggerDelay
+            triggerDelay: config.triggerDelay,
+            appType: config.appType
         });
         
         // 检查配置
-        if (!config.apiKey || !config.workflowId) {
+        if (!config.apiKey) {
             console.log('❌ Missing API configuration');
             if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
-                UiManager.showWarning('请先配置 Dify API Key 和 Workflow ID');
+                UiManager.showWarning('请先配置 Dify API Key');
             }
             return null;
         }
@@ -90,7 +90,7 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
         }, 5000);
 
         try {
-            const client = new DifyClient(config.apiKey, config.workflowId, config.baseUrl);
+            const client = new DifyClient(config.apiKey, config.baseUrl);
             
             // 检查取消令牌
             if (token.isCancellationRequested) {
@@ -100,7 +100,12 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
             }
 
             // 获取补全建议
-            const completion = await client.getCompletion(codeContext);
+            const completion = await client.getCompletion(
+                codeContext, 
+                config.appType, 
+                config.fallbackEnabled, 
+                config.preferredAppType
+            );
             
             if (token.isCancellationRequested) {
                 this.clearLoadingTimeout();
@@ -240,24 +245,10 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
         // 检查当前行内容
         const lineText = document.lineAt(position.line).text;
         const beforeCursor = lineText.substring(0, position.character);
-        
-        // 跳过空行或只有空格的行
-        if (beforeCursor.trim().length === 0) {
-            return false;
-        }
-
-        // 改进的注释检测 - 支持注释后换行的代码补全
         const trimmedBefore = beforeCursor.trim();
         
-        // 检查是否在注释中（但允许注释后的新行）
-        if (trimmedBefore.length > 0) {
-            // 如果当前行有内容且是注释，跳过
-            if (trimmedBefore.startsWith('//') || trimmedBefore.startsWith('#') || 
-                trimmedBefore.startsWith('/*') || trimmedBefore.startsWith('*')) {
-                return false;
-            }
-        } else {
-            // 如果当前行为空，检查上一行是否是注释
+        // 如果当前行为空，检查上一行是否是注释
+        if (trimmedBefore.length === 0) {
             if (position.line > 0) {
                 const prevLineText = document.lineAt(position.line - 1).text.trim();
                 
@@ -267,6 +258,14 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
                     return true;
                 }
             }
+            // 其他空行情况，跳过
+            return false;
+        }
+
+        // 检查是否在注释中
+        if (trimmedBefore.startsWith('//') || trimmedBefore.startsWith('#') || 
+            trimmedBefore.startsWith('/*') || trimmedBefore.startsWith('*')) {
+            return false;
         }
 
         // 检查是否在字符串中

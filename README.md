@@ -158,3 +158,10 @@ MIT License
 ---
 
 **享受 AI 驱动的编程体验！** 🚀
+
+
+```text
+curl -X GET 'http://localhost/v1/workflows/run/94efe12f-afc6-4348-bf3b-7ef3fbd7891e' \
+-H 'Authorization: Bearer app-S5M81rBORymDXNiXa3LN7xdR' \
+-H 'Content-Type: application/json'
+```

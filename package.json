@@ -1,99 +1,165 @@
 {
   "name": "vscode-codeflow-by-dify",
-  "displayName": "CodeFlow by Dify",
-  "description": "基于 Dify API 的智能代码补全插件，支持多种编程语言的 AI 驱动代码补全",
-  "version": "1.0.1",
+  "displayName": "Dify Code Completion",
+  "description": "AI-powered code completion using Dify workflows",
+  "version": "1.0.0",
   "publisher": "longmo",
   "engines": {
     "vscode": "^1.74.0"
   },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/vscode-codeflow-by-dify.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-username/vscode-codeflow-by-dify/issues"
-  },
-  "homepage": "https://github.com/your-username/vscode-codeflow-by-dify#readme",
   "categories": [
-    "Other",
-    "Machine Learning",
-    "Snippets"
-  ],
-  "keywords": [
-    "code completion",
-    "ai",
-    "dify",
-    "智能补全"
+    "Other"
   ],
   "activationEvents": [
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:typescriptreact",
-    "onLanguage:javascriptreact",
-    "onLanguage:vue",
-    "onLanguage:svelte",
-    "onLanguage:html",
-    "onLanguage:css",
-    "onLanguage:scss",
-    "onLanguage:python",
-    "onLanguage:go",
-    "onLanguage:java",
-    "onLanguage:php",
-    "onLanguage:rust"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "dify.triggerCompletion",
+        "title": "触发 Dify 代码补全"
+      },
+      {
+        "command": "dify.openSettings",
+        "title": "打开 Dify 设置"
+      },
+      {
+        "command": "dify.testConnection",
+        "title": "测试 Dify 连接"
+      },
+      {
+        "command": "dify.updateKeybinding",
+        "title": "更新快捷键配置"
+      }
+    ],
     "configuration": {
-      "type": "object",
       "title": "Dify Code Completion",
       "properties": {
         "dify.codeCompletion.apiKey": {
           "type": "string",
           "default": "",
-          "description": "Your Dify API Key",
-          "markdownDescription": "您的 Dify API 密钥。获取方式：登录 Dify 控制台 → API 管理 → 创建密钥"
-        },
-        "dify.codeCompletion.workflowId": {
-          "type": "string",
-          "default": "",
-          "description": "The Workflow ID in Dify for code completion",
-          "markdownDescription": "用于代码补全的 Dify 工作流 ID"
+          "description": "Dify API Key",
+          "order": 1
         },
         "dify.codeCompletion.baseUrl": {
           "type": "string",
           "default": "https://api.dify.ai/v1",
-          "description": "Dify API base URL",
-          "markdownDescription": "Dify API 基础 URL（私有部署时可修改）"
+          "description": "Dify API 基础 URL",
+          "order": 3
+        },
+        "dify.codeCompletion.appType": {
+          "type": "string",
+          "enum": [
+            "workflow",
+            "chatbot",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "工作流应用 - 适合复杂的代码生成逻辑",
+            "聊天助手应用 - 适合对话式代码补全",
+            "自动选择 - 根据首选应用类型智能选择"
+          ],
+          "default": "workflow",
+          "description": "Dify 应用类型",
+          "order": 4
+        },
+        "dify.codeCompletion.fallbackEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用降级策略 - 当主应用类型失败时尝试其他类型",
+          "order": 5
+        },
+        "dify.codeCompletion.preferredAppType": {
+          "type": "string",
+          "enum": [
+            "workflow",
+            "chatbot"
+          ],
+          "enumDescriptions": [
+            "工作流应用",
+            "聊天助手应用"
+          ],
+          "default": "workflow",
+          "description": "在自动模式下的首选应用类型",
+          "order": 6
+        },
+        "dify.codeCompletion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用 Dify 代码补全",
+          "order": 7
         },
         "dify.codeCompletion.autoTrigger": {
           "type": "boolean",
           "default": true,
-          "description": "Enable auto-trigger on typing",
-          "markdownDescription": "启用输入时自动触发补全"
+          "description": "自动触发补全",
+          "order": 8
         },
         "dify.codeCompletion.triggerDelay": {
           "type": "number",
           "default": 500,
           "minimum": 100,
           "maximum": 5000,
-          "description": "Delay in ms before triggering auto-completion",
-          "markdownDescription": "自动补全触发延迟（毫秒）"
+          "description": "触发延迟（毫秒）",
+          "order": 9
         },
         "dify.codeCompletion.contextLines": {
           "type": "number",
           "default": 10,
-          "minimum": 5,
+          "minimum": 1,
           "maximum": 50,
-          "description": "Number of lines before cursor to include as context",
-          "markdownDescription": "作为上下文的光标前行数"
+          "description": "上下文行数",
+          "order": 10
+        },
+        "dify.codeCompletion.triggerCharacters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".",
+            " ",
+            "(",
+            "=",
+            "{",
+            "\n"
+          ],
+          "description": "触发字符列表",
+          "order": 11
+        },
+        "dify.codeCompletion.triggerKeybinding": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "default": "ctrl+alt+space"
+            },
+            "mac": {
+              "type": "string",
+              "default": "cmd+shift+space"
+            },
+            "when": {
+              "type": "string",
+              "default": "editorTextFocus"
+            }
+          },
+          "default": {
+            "key": "ctrl+alt+space",
+            "mac": "cmd+shift+space",
+            "when": "editorTextFocus"
+          },
+          "description": "快捷键配置",
+          "order": 12
+        },
+        "dify.codeCompletion.testConnection": {
+          "type": "boolean",
+          "default": false,
+          "description": "测试连接（设置为 true 时自动测试）",
+          "order": 13
         },
         "dify.codeCompletion.languages": {
           "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
           "default": {
             "javascript": "javascript",
             "typescript": "typescript",
@@ -125,86 +191,11 @@
             "markdown": "markdown",
             "shellscript": "bash"
           },
-          "description": "Map VS Code language IDs to Dify language codes",
-          "markdownDescription": "VS Code 语言 ID 到 Dify 语言代码的映射"
-        },
-        "dify.codeCompletion.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable/disable the extension",
-          "markdownDescription": "启用/禁用插件"
-        },
-        "dify.codeCompletion.testConnection": {
-          "type": "boolean",
-          "default": false,
-          "description": "Test API connection (click to test)",
-          "markdownDescription": "**测试 API 连接**  \n点击下方按钮测试连接状态。确保已正确配置 API Key 和 Workflow ID。"
-        },
-        "dify.codeCompletion.triggerCharacters": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [".", " ", "(", "=", "{", "\n"],
-          "description": "Characters that trigger auto-completion",
-          "markdownDescription": "触发自动补全的字符列表。支持特殊字符：\\n (换行)、\\t (制表符)、\\s (空格)"
-        },
-        "dify.codeCompletion.triggerKeybinding": {
-          "type": "object",
-          "properties": {
-            "key": {
-              "type": "string",
-              "default": "ctrl+alt+space"
-            },
-            "mac": {
-              "type": "string", 
-              "default": "cmd+shift+space"
-            },
-            "when": {
-              "type": "string",
-              "default": "editorTextFocus"
-            }
-          },
-          "default": {
-            "key": "ctrl+alt+space",
-            "mac": "cmd+shift+space", 
-            "when": "editorTextFocus"
-          },
-          "description": "Custom keybinding for triggering code completion",
-          "markdownDescription": "自定义触发代码补全的快捷键配置。支持 VS Code 快捷键格式，如：ctrl+alt+space、cmd+shift+i 等"
+          "description": "支持的编程语言映射",
+          "order": 14
         }
       }
-    },
-    "commands": [
-      {
-        "command": "dify.triggerCompletion",
-        "title": "Trigger Code Completion",
-        "category": "Dify"
-      },
-      {
-        "command": "dify.openSettings",
-        "title": "Open Settings",
-        "category": "Dify"
-      },
-      {
-        "command": "dify.testConnection",
-        "title": "Test API Connection",
-        "category": "Dify"
-      },
-      {
-        "command": "dify.updateKeybinding",
-        "title": "Update Keybinding Configuration",
-        "category": "Dify"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "dify.triggerCompletion",
-        "key": "ctrl+alt+space",
-        "mac": "cmd+shift+space",
-        "when": "editorTextFocus"
-      }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
