@@ -305,57 +305,126 @@ export class DifyClient {
     }
 
     private buildWorkflowPrompt(context: CodeContext): string {
-        return `请为以下 ${context.language} 代码提供补全建议。只返回需要补全的代码部分，不要包含解释或其他文本。
+        return `作为一个专业的${context.language}代码补全助手，请为光标位置提供准确的代码补全。
+
+规则：
+1. 只返回需要补全的代码，不要包含任何解释、注释或代码块标记
+2. 不要重复已有的代码
+3. 确保补全的代码语法正确且符合上下文
+4. 如果是赋值语句，只返回等号后面的值
+5. 如果是对象或数组，确保格式正确
 
 当前代码:
-\`\`\`${context.language}
 ${context.code_before_cursor}
-\`\`\`
 
-请补全光标位置的代码:`;
+补全内容:`;
     }
 
     private buildChatPrompt(context: CodeContext): string {
-        return `请为以下 ${context.language} 代码提供补全建议。只返回需要补全的代码部分，不要包含解释或其他文本。
+        return `作为一个专业的${context.language}代码补全助手，请为光标位置提供准确的代码补全。
+
+规则：
+1. 只返回需要补全的代码，不要包含任何解释、注释或代码块标记
+2. 不要重复已有的代码
+3. 确保补全的代码语法正确且符合上下文
+4. 如果是赋值语句，只返回等号后面的值
+5. 如果是对象或数组，确保格式正确
 
 当前代码:
-\`\`\`${context.language}
 ${context.code_before_cursor}
-\`\`\`
 
-请补全光标位置的代码:`;
+补全内容:`;
     }
 
     private extractCodeFromChatResponse(answer: string): string {
-        // 尝试从回复中提取代码块
-        const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)\s*```/;
-        const match = answer.match(codeBlockRegex);
+        // 清理回复内容
+        let cleanAnswer = answer.trim();
         
-        if (match && match[1]) {
-            // 提取代码块中的内容
-            const code = match[1].trim();
-            // 如果是完整函数，只返回补全部分
-            if (code.includes('function') && code.includes('{') && code.includes('}')) {
-                // 尝试提取 return 语句或函数体
-                const returnMatch = code.match(/return\s+([^;]+);?/);
-                if (returnMatch) {
-                    return ` ${returnMatch[1]};`;
+        // 移除常见的解释性文本
+        const explanationPatterns = [
+            /^(Here's|Here is|This is|The|You can|Try this|Consider|Based on)/i,
+            /^(以下是|这是|可以|尝试|考虑|根据)/,
+            /^(补全|完成|建议|代码)/
+        ];
+        
+        for (const pattern of explanationPatterns) {
+            cleanAnswer = cleanAnswer.replace(pattern, '').trim();
+        }
+        
+        // 尝试提取代码块内容
+        const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)\s*```/g;
+        const codeBlocks = [];
+        let match;
+        
+        while ((match = codeBlockRegex.exec(cleanAnswer)) !== null) {
+            if (match[1] && match[1].trim()) {
+                codeBlocks.push(match[1].trim());
+            }
+        }
+        
+        if (codeBlocks.length > 0) {
+            // 使用第一个代码块
+            let code = codeBlocks[0];
+            
+            // 如果代码块以语言标识符开头，移除它
+            if (code.startsWith('typescript') || code.startsWith('javascript') || 
+                code.startsWith('python') || code.startsWith('java')) {
+                const lines = code.split('\n');
+                if (lines.length > 1) {
+                    code = lines.slice(1).join('\n').trim();
                 }
             }
-            return code;
+            
+            return this.cleanupCodeCompletion(code);
         }
         
-        // 如果没有代码块，尝试直接提取简单的补全
-        const lines = answer.split('\n');
+        // 如果没有代码块，处理纯文本回复
+        const lines = cleanAnswer.split('\n');
+        const codeLines = [];
+        
         for (const line of lines) {
             const trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith('Here') && !trimmed.startsWith('This') && 
-                !trimmed.startsWith('The') && !trimmed.includes('function')) {
-                return trimmed;
+            if (trimmed && 
+                !trimmed.startsWith('//') && 
+                !trimmed.startsWith('#') &&
+                !trimmed.match(/^(Here|This|The|You|Try|Consider|Based|以下|这是|可以|尝试|考虑|根据)/i)) {
+                codeLines.push(trimmed);
             }
         }
         
-        return answer.trim();
+        if (codeLines.length > 0) {
+            return this.cleanupCodeCompletion(codeLines.join('\n'));
+        }
+        
+        return this.cleanupCodeCompletion(cleanAnswer);
+    }
+    
+    private cleanupCodeCompletion(code: string): string {
+        // 移除多余的空行
+        code = code.replace(/\n\s*\n\s*\n/g, '\n\n');
+        
+        // 移除开头和结尾的空行
+        code = code.trim();
+        
+        // 如果代码以分号结尾但前面没有内容，移除分号
+        if (code === ';') {
+            return '';
+        }
+        
+        // 处理常见的格式问题
+        // 如果是对象字面量，确保格式正确
+        if (code.includes('{') && code.includes('}')) {
+            // 简单的对象格式化
+            code = code.replace(/{\s*([^}]+)\s*}/, (match, content) => {
+                const properties = content.split(',').map((prop: string) => prop.trim()).filter((prop: string) => prop);
+                if (properties.length > 0) {
+                    return '{\n  ' + properties.join(',\n  ') + '\n}';
+                }
+                return '{}';
+            });
+        }
+        
+        return code;
     }
 
     public async testConnection(appType: 'auto' | 'workflow' | 'chatbot' = 'workflow', fallbackEnabled: boolean = true, preferredAppType: 'workflow' | 'chatbot' = 'workflow'): Promise<boolean> {

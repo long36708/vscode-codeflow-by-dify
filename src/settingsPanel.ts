@@ -94,6 +94,9 @@ export class SettingsPanel {
             await ConfigManager.updateConfiguration('triggerDelay', config.triggerDelay);
             await ConfigManager.updateConfiguration('contextLines', config.contextLines);
             await ConfigManager.updateConfiguration('enabled', config.enabled);
+            await ConfigManager.updateConfiguration('appType', config.appType);
+            await ConfigManager.updateConfiguration('fallbackEnabled', config.fallbackEnabled);
+            await ConfigManager.updateConfiguration('preferredAppType', config.preferredAppType);
 
             this._panel.webview.postMessage({
                 command: 'saveResult',
@@ -234,6 +237,10 @@ export class SettingsPanel {
             background-color: var(--vscode-editor-inactiveSelectionBackground);
             border-left: 4px solid var(--vscode-textLink-foreground);
         }
+        .app-type-section {
+            background-color: var(--vscode-editor-selectionBackground);
+            border-left: 4px solid var(--vscode-charts-blue);
+        }
     </style>
 </head>
 <body>
@@ -246,15 +253,8 @@ export class SettingsPanel {
                 <label for="apiKey">API Key *</label>
                 <input type="password" id="apiKey" placeholder="输入您的 Dify API Key">
                 <div class="help-text">
-                    获取方式：登录 Dify 控制台 → API 管理 → 创建密钥
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="workflowId">Workflow ID *</label>
-                <input type="text" id="workflowId" placeholder="输入工作流 ID">
-                <div class="help-text">
-                    用于代码补全的 Dify 工作流 ID
+                    获取方式：登录 Dify 控制台 → API 管理 → 创建密钥<br>
+                    注意：API Key 已与应用绑定，无需额外配置应用 ID
                 </div>
             </div>
             
@@ -262,7 +262,42 @@ export class SettingsPanel {
                 <label for="baseUrl">API 基础 URL</label>
                 <input type="text" id="baseUrl" value="https://api.dify.ai/v1">
                 <div class="help-text">
-                    私有部署时可修改此 URL
+                    私有部署时可修改此 URL（如：http://localhost/v1）
+                </div>
+            </div>
+        </div>
+
+        <div class="section app-type-section">
+            <h2>🎯 应用类型配置</h2>
+            
+            <div class="form-group">
+                <label for="appType">应用类型</label>
+                <select id="appType">
+                    <option value="workflow">工作流应用 - 适合复杂的代码生成逻辑</option>
+                    <option value="chatbot">聊天助手应用 - 适合对话式代码补全</option>
+                    <option value="auto">自动选择 - 根据首选应用类型智能选择</option>
+                </select>
+                <div class="help-text">
+                    选择您在 Dify 平台创建的应用类型
+                </div>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="fallbackEnabled">
+                <label for="fallbackEnabled">启用降级策略</label>
+                <div class="help-text">
+                    当主应用类型失败时，自动尝试其他应用类型
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="preferredAppType">首选应用类型（自动模式下）</label>
+                <select id="preferredAppType">
+                    <option value="workflow">工作流应用</option>
+                    <option value="chatbot">聊天助手应用</option>
+                </select>
+                <div class="help-text">
+                    在自动模式下优先使用的应用类型
                 </div>
             </div>
         </div>
@@ -343,8 +378,10 @@ export class SettingsPanel {
 
         function populateForm(config) {
             document.getElementById('apiKey').value = config.apiKey || '';
-            document.getElementById('workflowId').value = config.workflowId || '';
             document.getElementById('baseUrl').value = config.baseUrl || 'https://api.dify.ai/v1';
+            document.getElementById('appType').value = config.appType || 'workflow';
+            document.getElementById('fallbackEnabled').checked = config.fallbackEnabled !== false;
+            document.getElementById('preferredAppType').value = config.preferredAppType || 'workflow';
             document.getElementById('enabled').checked = config.enabled !== false;
             document.getElementById('autoTrigger').checked = config.autoTrigger !== false;
             document.getElementById('triggerDelay').value = config.triggerDelay || 500;
@@ -354,8 +391,10 @@ export class SettingsPanel {
         function getFormData() {
             return {
                 apiKey: document.getElementById('apiKey').value.trim(),
-                workflowId: document.getElementById('workflowId').value.trim(),
                 baseUrl: document.getElementById('baseUrl').value.trim(),
+                appType: document.getElementById('appType').value,
+                fallbackEnabled: document.getElementById('fallbackEnabled').checked,
+                preferredAppType: document.getElementById('preferredAppType').value,
                 enabled: document.getElementById('enabled').checked,
                 autoTrigger: document.getElementById('autoTrigger').checked,
                 triggerDelay: parseInt(document.getElementById('triggerDelay').value),
@@ -366,8 +405,8 @@ export class SettingsPanel {
         function testConnection() {
             const config = getFormData();
             
-            if (!config.apiKey || !config.workflowId) {
-                showTestResult('error', '❌ 请先填写 API Key 和 Workflow ID');
+            if (!config.apiKey) {
+                showTestResult('error', '❌ 请先填写 API Key');
                 return;
             }
             
