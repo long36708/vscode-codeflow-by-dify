@@ -20,8 +20,37 @@ export function activate(context: vscode.ExtensionContext) {
             UiManager.showWarning('没有活动的编辑器');
             return;
         }
-        // 手动触发补全
-        await vscode.commands.executeCommand('editor.action.triggerSuggest');
+
+        // 检查配置
+        const config = ConfigManager.getConfiguration();
+        if (!config.apiKey) {
+            UiManager.showError('请先配置 Dify API Key');
+            vscode.commands.executeCommand('dify.openSettings');
+            return;
+        }
+
+        if (!config.enabled) {
+            UiManager.showWarning('Dify 代码补全已禁用，请在设置中启用');
+            return;
+        }
+
+        // 显示触发提示
+        const statusBarMessage = vscode.window.setStatusBarMessage('$(sync~spin) 正在获取 Dify AI 代码补全...', 10000);
+        
+        try {
+            // 手动触发补全
+            await vscode.commands.executeCommand('editor.action.triggerSuggest');
+            
+            // 短暂延迟后显示成功提示
+            setTimeout(() => {
+                statusBarMessage.dispose();
+                vscode.window.setStatusBarMessage('$(check) Dify 代码补全已触发', 3000);
+            }, 500);
+            
+        } catch (error) {
+            statusBarMessage.dispose();
+            UiManager.showError(`触发代码补全失败: ${error instanceof Error ? error.message : String(error)}`);
+        }
     });
 
     const openSettingsCommand = vscode.commands.registerCommand('dify.openSettings', () => {
@@ -61,27 +90,21 @@ export function activate(context: vscode.ExtensionContext) {
         const config = vscode.workspace.getConfiguration('dify.codeCompletion');
         const keybindingConfig = config.get<any>('triggerKeybinding', {
             key: 'ctrl+alt+space',
-            mac: 'cmd+shift+space',
+            mac: 'cmd+shift+semicolon',
             when: 'editorTextFocus'
         });
 
-        const message = `当前快捷键配置：
-Windows/Linux: ${keybindingConfig.key}
-Mac: ${keybindingConfig.mac}
-触发条件: ${keybindingConfig.when}
+        const currentPlatform = process.platform === 'darwin' ? 'Mac' : 'Windows/Linux';
+        const displayMacKey = 'Cmd+Shift+;';
+        const currentKey = process.platform === 'darwin' ? displayMacKey : keybindingConfig.key;
 
-要应用新的快捷键配置，请手动添加到 VS Code 的 keybindings.json 文件中：
-{
-    "command": "dify.triggerCompletion",
-    "key": "${keybindingConfig.key}",
-    "mac": "${keybindingConfig.mac}",
-    "when": "${keybindingConfig.when}"
-}`;
+        const message = `当前快捷键配置：\nWindows/Linux: ${keybindingConfig.key}\nMac: ${displayMacKey}\n触发条件: ${keybindingConfig.when}\n\n当前平台 (${currentPlatform}) 使用: ${currentKey}\n\n要应用新的快捷键配置，请手动添加到 VS Code 的 keybindings.json 文件中：\n{\n    "command": "dify.triggerCompletion",\n    "key": "${keybindingConfig.key}",\n    "mac": "${keybindingConfig.mac}",\n    "when": "${keybindingConfig.when}"\n}`;
 
         const action = await vscode.window.showInformationMessage(
             message,
             '打开 keybindings.json',
-            '复制配置'
+            '复制配置',
+            '测试快捷键'
         );
 
         if (action === '打开 keybindings.json') {
@@ -96,6 +119,8 @@ Mac: ${keybindingConfig.mac}
             
             await vscode.env.clipboard.writeText(keybindingJson);
             UiManager.showInfo('快捷键配置已复制到剪贴板');
+        } else if (action === '测试快捷键') {
+            UiManager.showInfo(`请按 ${currentKey} 来测试 Dify 代码补全功能`);
         }
     });
 
@@ -219,12 +244,13 @@ Mac: ${keybindingConfig.mac}
         const config = vscode.workspace.getConfiguration('dify.codeCompletion');
         const keybindingConfig = config.get<any>('triggerKeybinding', {
             key: 'ctrl+alt+space',
-            mac: 'cmd+shift+space',
+            mac: 'cmd+shift+semicolon',
             when: 'editorTextFocus'
         });
         
         // 注册动态快捷键（通过命令面板提示用户）
-        UiManager.showInfo(`快捷键已设置为: ${process.platform === 'darwin' ? keybindingConfig.mac : keybindingConfig.key}`);
+        const displayKey = process.platform === 'darwin' ? 'Cmd+Shift+;' : keybindingConfig.key;
+        UiManager.showInfo(`快捷键已设置为: ${displayKey}`);
     }
     
     // 初始注册快捷键

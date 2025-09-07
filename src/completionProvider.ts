@@ -23,9 +23,20 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
             position: `${position.line}:${position.character}`
         });
 
+        // 如果是手动触发，显示友好提示
+        if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
+            console.log('👆 Manual trigger detected - showing user feedback');
+            vscode.window.setStatusBarMessage('$(sync~spin) Dify AI 正在分析代码...', 2000);
+        }
+
         // 检查是否应该触发补全
         if (!this.shouldProvideCompletion(document, position, context)) {
             console.log('❌ Completion blocked by shouldProvideCompletion');
+            if (context.triggerKind === vscode.CompletionTriggerKind.Invoke) {
+                // 手动触发被阻止时，给出具体原因
+                const reason = this.getBlockReason(document, position);
+                UiManager.showWarning(`无法在此位置提供补全: ${reason}`);
+            }
             return null;
         }
 
@@ -279,5 +290,46 @@ export class DifyCompletionProvider implements vscode.CompletionItemProvider {
 
         console.log(`Completion trigger allowed for ${document.languageId} at ${position.line}:${position.character}`);
         return true;
+    }
+
+    private getBlockReason(document: vscode.TextDocument, position: vscode.Position): string {
+        const config = ConfigManager.getConfiguration();
+        
+        // 检查是否启用
+        if (!config.enabled) {
+            return '代码补全功能已禁用';
+        }
+
+        // 检查语言支持
+        if (!ConfigManager.isLanguageSupported(document.languageId)) {
+            return `不支持 ${document.languageId} 语言`;
+        }
+
+        // 检查当前行内容
+        const lineText = document.lineAt(position.line).text;
+        const beforeCursor = lineText.substring(0, position.character);
+        const trimmedBefore = beforeCursor.trim();
+        
+        // 检查是否在注释中
+        if (trimmedBefore.startsWith('//') || trimmedBefore.startsWith('#') || 
+            trimmedBefore.startsWith('/*') || trimmedBefore.startsWith('*')) {
+            return '不在注释中提供补全';
+        }
+
+        // 检查是否在字符串中
+        const singleQuotes = (beforeCursor.match(/'/g) || []).length;
+        const doubleQuotes = (beforeCursor.match(/"/g) || []).length;
+        const backticks = (beforeCursor.match(/`/g) || []).length;
+        
+        if (singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1) {
+            return '不在字符串字面量中提供补全';
+        }
+
+        // 如果当前行为空
+        if (trimmedBefore.length === 0) {
+            return '当前行为空，请输入一些代码后再试';
+        }
+
+        return '当前位置不适合代码补全';
     }
 }

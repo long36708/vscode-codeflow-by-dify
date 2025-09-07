@@ -137,7 +137,7 @@
             },
             "mac": {
               "type": "string",
-              "default": "cmd+shift+space"
+              "default": "cmd+shift+semicolon"
             },
             "when": {
               "type": "string",
@@ -146,7 +146,7 @@
           },
           "default": {
             "key": "ctrl+alt+space",
-            "mac": "cmd+shift+space",
+            "mac": "cmd+shift+semicolon",
             "when": "editorTextFocus"
           },
           "description": "快捷键配置",
